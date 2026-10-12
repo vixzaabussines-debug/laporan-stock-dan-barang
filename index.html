@@ -244,6 +244,7 @@ table.rp{width:100%;border-collapse:collapse;font-size:10pt}
      <div class="chips" id="chips"><button class="chip on" data-f="all">Semua</button><button class="chip" data-f="f">Terisi</button><button class="chip" data-f="e">Kosong</button></div>
      <button class="s g" id="bClr">Kosongkan stok awal</button>
     </div>
+    <div class="tools" style="gap:8px;flex-wrap:wrap"><button class="s g" id="bML"></button><button class="s g" id="bMR"></button></div>
     <div class="pg"><i id="pgb"></i></div>
     <div class="tabs" id="tabs"><button class="tab on" data-i="0">Stok Awal</button><button class="tab" data-i="1">Stok Masuk</button><button class="tab" data-i="2">Stok Keluar</button></div>
     <div class="sw" id="tb"><div class="pane" id="p0"></div><div class="pane" id="p1"></div><div class="pane" id="p2"></div></div>
@@ -342,7 +343,7 @@ function render(){
    '<div class="qt"><input inputmode="decimal" enterkeyhint="next" autocomplete="off" data-f="'+fk+'" value="'+(r[fk]==null?'':esc(r[fk]))+'" placeholder="0" aria-label="'+FL[p]+' '+esc(it.nama)+'"><span class="un">'+esc(it.sat)+'</span></div>'+
    '<div class="mv">'+(p>0?'<button class="mvb" data-mv="-1">◀ Ke '+FL[p-1]+'</button>':'')+(p<2?'<button class="mvb" data-mv="1">Ke '+FL[p+1]+' ▶</button>':'')+'</div></div>'});
   $('p'+p).innerHTML=h||'<div class="empty">'+m+'</div>'});
- stats();
+ stats();updMv();
 }
 $('tb').addEventListener('input',function(e){
  var t=e.target,f=t.getAttribute('data-f');if(!f)return;
@@ -373,6 +374,21 @@ $('tb').addEventListener('click',function(e){
  r[fa]=r[fb]==null?'':r[fb];r[fb]=v;
  save();render();toast(had?'Isi kedua kolom ditukar':'Dipindah ke '+FL[to]);
 });
+function updMv(){var l=$('bML'),r=$('bMR');
+ l.style.display=curI>0?'':'none';r.style.display=curI<2?'':'none';
+ if(curI>0)l.textContent='◀ Pindah semua ke '+FL[curI-1];
+ if(curI<2)r.textContent='Pindah semua ke '+FL[curI+1]+' ▶'}
+function moveAll(dir){
+ var p=curI,to=p+dir;if(to<0||to>2)return;var k=key(),d=S.data[k]||{},n=0;
+ S.items.forEach(function(it){if(filled(d[it.id],F[p]))n++});
+ if(!n){toast('Tidak ada isian di '+FL[p]);return}
+ confirmM('Pindahkan semua','Pindahkan semua isian '+FL[p]+' ('+n+' barang) ke '+FL[to]+'? Jika barang yang sama sudah terisi di '+FL[to]+', kedua isinya ditukar.',function(){
+  S.data[k]=S.data[k]||{};
+  S.items.forEach(function(it){var r=S.data[k][it.id];if(!r||!filled(r,F[p]))return;
+   var v=r[F[p]];r[F[p]]=r[F[to]]==null?'':r[F[to]];r[F[to]]=v});
+  save();render();toast('Semua isian dipindah ke '+FL[to])},'Ya, pindahkan')}
+$('bML').onclick=function(){moveAll(-1)};
+$('bMR').onclick=function(){moveAll(1)};
 function delItem(it){confirmM('Hapus barang','Hapus "'+it.nama+'" dari daftar? Data stok barang ini di semua tanggal akan tidak tampil lagi.',function(){
  S.items=S.items.filter(function(x){return x.id!==it.id});save();render();toast('Barang dihapus')})}
 $('cari').addEventListener('input',render);
@@ -386,7 +402,7 @@ $('bClr').onclick=function(){var f=F[curI],nm=FL[curI];
 /* halaman geser: Stok Awal | Stok Masuk | Stok Keluar */
 function setTab(i,sc){i=Math.max(0,Math.min(2,i));curI=i;
  Array.prototype.forEach.call($('tabs').children,function(b,j){b.className='tab'+(j===i?' on':'')});
- $('bClr').textContent='Kosongkan '+FL[i].toLowerCase();stats();
+ $('bClr').textContent='Kosongkan '+FL[i].toLowerCase();stats();updMv();
  if(!sc){lockT=Date.now()+600;var x=i*$('tb').clientWidth;try{$('tb').scrollTo({left:x,behavior:'smooth'})}catch(e){$('tb').scrollLeft=x}}}
 $('tabs').addEventListener('click',function(e){var b=e.target.closest('.tab');if(b)setTab(+b.getAttribute('data-i'))});
 $('tb').addEventListener('scroll',function(){if(Date.now()<lockT)return;var w=$('tb').clientWidth||1,i=Math.round($('tb').scrollLeft/w);if(i!==curI)setTab(i,true)});
