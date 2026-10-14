@@ -249,6 +249,7 @@ table.rp{width:100%;border-collapse:collapse;font-size:10pt}
     <div class="tools">
      <div class="srch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="cari" placeholder="Cari barang…" aria-label="Cari barang"></div>
      <button class="p" id="bTambah">+ Tambah Barang</button>
+     <button class="g" id="bScan">📷 Scan Timbangan</button>
     </div>
     <div class="tools" style="justify-content:space-between">
      <div class="chips" id="chips"><button class="chip on" data-f="all">Semua</button><button class="chip" data-f="f">Terisi</button><button class="chip" data-f="e">Kosong</button></div>
@@ -290,7 +291,6 @@ table.rp{width:100%;border-collapse:collapse;font-size:10pt}
 <div id="boot"><i></i></div>
 <div class="ov" id="lg"><div class="md"><div class="lgm"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div><h3>Masuk</h3><p class="sub" id="lgN" style="margin-top:0">Masuk dengan akun cabang Anda.</p><div class="f"><label for="lgE">Email</label><input id="lgE" type="email" autocomplete="username" placeholder="nama@email.com"></div><div class="f"><label for="lgP">Kata sandi</label><input id="lgP" type="password" autocomplete="current-password" placeholder="••••••••"></div><div class="er" id="lgEr"></div><div class="bt"><button class="p" id="lgB" style="width:100%">Masuk</button></div></div></div>
 <input type="file" id="camIn" accept="image/*" capture="environment" style="display:none">
-<input type="file" id="fileIn" accept="image/*" style="display:none">
 <div id="toast"></div>
 
 <script>
@@ -632,8 +632,7 @@ function loadJs(src){return new Promise(function(ok,no){var s=document.createEle
 function getOcr(){
  if(ocrP)return ocrP;
  ocrP=(window.Tesseract?Promise.resolve():loadJs('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js')).then(function(){
-  return Tesseract.createWorker('eng',1,{})}).then(function(w){
-  return w.setParameters({tessedit_char_whitelist:'0123456789.,'}).then(function(){return w})});
+  return Tesseract.createWorker('eng',1,{})});
  ocrP.catch(function(){ocrP=null});return ocrP}
 function loadImg(file){return new Promise(function(ok,no){var u=URL.createObjectURL(file),im=new Image();im.onload=function(){URL.revokeObjectURL(u);ok(im)};im.onerror=function(){URL.revokeObjectURL(u);no(new Error('img'))};im.src=u})}
 function thumbOf(im){var w=im.naturalWidth||im.width,h=im.naturalHeight||im.height,s=Math.min(1,320/w),c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*s));c.height=Math.max(1,Math.round(h*s));c.getContext('2d').drawImage(im,0,0,c.width,c.height);return{d:c.toDataURL('image/jpeg',.6),w:c.width,h:c.height}}
@@ -652,63 +651,208 @@ function prep(im,b,inv){
 var BOXES=[{x:.05,y:.28,w:.9,h:.44},{x:0,y:0,w:1,h:1}];
 function readNum(t){t=String(t||'').replace(/(\d)[ \t]+(?=[\d.,])/g,'$1');var m=t.match(/\d+(?:[.,]\d+)?/g);if(!m)return'';
  m.sort(function(a,b){return b.replace(/\D/g,'').length-a.replace(/\D/g,'').length});return m[0].replace(',','.')}
-function ocrRun(im,prog,alive){
+function ocrRun(im,prog,alive,boxes){
+ boxes=boxes||BOXES;
  return getOcr().then(function(w){
-  var jobs=[[0,0,'7'],[0,1,'7'],[1,0,'11'],[1,1,'11']],best={v:'',c:-1,s:-1},k=0;
+  var jobs=[],best={v:'',c:-1,s:-1},k=0;
+  boxes.forEach(function(b,i){var m=i<boxes.length-1?'7':'11';jobs.push([b,0,m]);jobs.push([b,1,m])});
   function next(){
    if(k>=jobs.length||best.c>=80||!alive())return Promise.resolve(best);
    var j=jobs[k++];prog('Membaca angka… ('+k+'/'+jobs.length+')');
-   return w.setParameters({tessedit_pageseg_mode:j[2]}).then(function(){return w.recognize(prep(im,BOXES[j[0]],!!j[1]))}).then(function(r){
+   return w.setParameters({tessedit_char_whitelist:'0123456789.,',tessedit_pageseg_mode:j[2]}).then(function(){return w.recognize(prep(im,j[0],!!j[1]))}).then(function(r){
     var v=readNum(r.data&&r.data.text),c=(r.data&&r.data.confidence)||0;
     if(v){var s=c+Math.min(v.replace(/\D/g,'').length,6)*4;if(s>best.s)best={v:v,c:c,s:s}}
     return next()})}
   return next()})}
 function unitKind(s){s=String(s||'').trim().toLowerCase();return(s==='gram'||s==='g'||s==='gr')?'g':(s==='kg'||s==='kilogram')?'kg':''}
-function camStart(it,pi){camCtx={it:it,f:F[+pi]||F[curI]};camPick()}
-function camPick(){
- openM('<h3>📷 Foto Timbangan</h3><p style="margin:0 0 14px"><b>'+esc(camCtx.it.nama)+'</b></p><div style="display:flex;flex-direction:column;gap:8px"><button class="p" id="pk1">📷 Ambil Foto</button><button id="pk2">🖼️ Pilih dari File / Galeri</button><button id="pk3">Batal</button></div>');
- $('pk1').onclick=function(){closeM();$('camIn').value='';$('camIn').click()};
- $('pk2').onclick=function(){closeM();$('fileIn').value='';$('fileIn').click()};
- $('pk3').onclick=closeM}
+/* ---- Pembaca layar digital 7-segmen (cepat, tanpa internet) ---- */
+function otsuTh(g,n){var hs=new Array(256).fill(0),sum=0,i;for(i=0;i<n;i++){hs[g[i]]++;sum+=g[i]}
+ var sB=0,wB=0,mx=0,th=127;
+ for(i=0;i<256;i++){wB+=hs[i];if(!wB)continue;var wF=n-wB;if(!wF)break;sB+=i*hs[i];var mB=sB/wB,mF=(sum-sB)/wF,bt=wB*wF*(mB-mF)*(mB-mF);if(bt>mx){mx=bt;th=i}}
+ return th}
+/* cari kotak layar timbangan yang menyala (hijau/cyan) */
+function lcdFind(im){
+ var sw=im.naturalWidth||im.width,sh=im.naturalHeight||im.height,s=Math.min(1,480/Math.max(sw,sh)),
+ w=Math.max(8,Math.round(sw*s)),h=Math.max(8,Math.round(sh*s)),c=document.createElement('canvas');
+ c.width=w;c.height=h;var cx=c.getContext('2d');cx.drawImage(im,0,0,w,h);
+ var p=cx.getImageData(0,0,w,h).data,n=w*h,m=new Uint8Array(n),i;
+ for(i=0;i<n;i++){var r=p[i*4],g=p[i*4+1],b=p[i*4+2];if(g>130&&g-r>55&&b>r+20)m[i]=1}
+ var seen=new Uint8Array(n),best=null,st=[];
+ for(i=0;i<n;i++){if(!m[i]||seen[i])continue;
+  var cnt=0,x0=w,y0=h,x1=0,y1=0;st.length=0;st.push(i);seen[i]=1;
+  while(st.length){var q=st.pop(),qx=q%w,qy=(q-qx)/w;cnt++;
+   if(qx<x0)x0=qx;if(qx>x1)x1=qx;if(qy<y0)y0=qy;if(qy>y1)y1=qy;
+   if(qx>0&&m[q-1]&&!seen[q-1]){seen[q-1]=1;st.push(q-1)}
+   if(qx<w-1&&m[q+1]&&!seen[q+1]){seen[q+1]=1;st.push(q+1)}
+   if(qy>0&&m[q-w]&&!seen[q-w]){seen[q-w]=1;st.push(q-w)}
+   if(qy<h-1&&m[q+w]&&!seen[q+w]){seen[q+w]=1;st.push(q+w)}}
+  if(!best||cnt>best.cnt)best={cnt:cnt,x0:x0,y0:y0,x1:x1,y1:y1}}
+ if(!best||best.cnt<n*.002)return null;
+ var bw=best.x1-best.x0+1,bh=best.y1-best.y0+1;if(bw/bh<1.3||bw/bh>9)return null;
+ return{x:best.x0/s,y:best.y0/s,w:bw/s,h:bh/s}}
+function lcdBoxes(im){var bx=null;try{bx=lcdFind(im)}catch(e){}
+ if(!bx)return BOXES;var sw=im.naturalWidth||im.width,sh=im.naturalHeight||im.height;
+ return[{x:Math.max(0,(bx.x+bx.w*.5)/sw),y:Math.max(0,(bx.y+bx.h*.03)/sh),w:Math.min(1,bx.w*.48/sw),h:Math.min(1,bx.h*.72/sh)}].concat(BOXES)}
+var SEGT={'abcdef':'0','bc':'1','abdeg':'2','abcdg':'3','bcfg':'4','acdfg':'5','acdefg':'6','cdefg':'6','abc':'7','abcf':'7','abcdefg':'8','abcdfg':'9','abcfg':'9'};
+/* baca angka bagian "Weight" di layar. Mengembalikan {v:'453.2'} atau null bila ragu */
+function lcdRead(im){
+ var bx=lcdFind(im);if(!bx)return null;
+ var mx=bx.w*.04,my=bx.h*.06,sx=bx.x+mx,sy=bx.y+my,sw2=bx.w-2*mx,sh2=bx.h-2*my;if(sw2<20||sh2<10)return null;
+ var H=140,sc=H/sh2,W=Math.max(60,Math.round(sw2*sc)),c=document.createElement('canvas');c.width=W;c.height=H;
+ var cx=c.getContext('2d');cx.drawImage(im,sx,sy,sw2,sh2,0,0,W,H);
+ var d=cx.getImageData(0,0,W,H).data,n=W*H,g=new Uint8Array(n),i,x,y;
+ for(i=0;i<n;i++)g[i]=Math.round(.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2]);
+ var th=otsuTh(g,n),D=new Uint8Array(n);for(i=0;i<n;i++)D[i]=g[i]<=th?1:0;
+ /* hapus garis tegak (pemisah timer|berat & bingkai) dan garis datar */
+ var dx=null,cl=[];
+ for(x=0;x<W;x++){var cs=0;for(y=0;y<H;y++)cs+=D[y*W+x];if(cs>H*.8){cl.push(x);if(x>W*.2&&x<W*.8)dx=x}}
+ cl.forEach(function(q){for(var z=q-1;z<=q+1;z++){if(z<0||z>=W)continue;for(var yy=0;yy<H;yy++)D[yy*W+z]=0}});
+ for(y=0;y<H;y++){var rs=0;for(x=0;x<W;x++)rs+=D[y*W+x];if(rs>W*.9)for(x=0;x<W;x++)D[y*W+x]=0}
+ var x0w=dx!==null?Math.min(W-20,dx+3):Math.round(W*.5),ww=W-x0w;
+ /* pita baris angka: deretan baris terpanjang */
+ var rc=new Array(H).fill(0),mxr=0;
+ for(y=0;y<H;y++){var s2=0;for(x=x0w;x<W;x++)s2+=D[y*W+x];rc[y]=s2;if(s2>mxr)mxr=s2}
+ if(mxr<5)return null;
+ var thr=mxr*.2,band=null,ys=-1,ye=-1,gap=0;
+ for(y=0;y<=H;y++){var on=y<H&&rc[y]>thr;
+  if(on){if(ys<0)ys=y;ye=y;gap=0}
+  else if(ys>=0){gap++;if(gap>3||y===H){var len=ye-ys+1;if(!band||len>band.len)band={a:ys,b:ye,len:len};ys=-1;gap=0}}}
+ if(!band||band.len<H*.25||band.len>H*.95)return null;
+ var bh=band.len,ya=band.a;
+ /* luruskan kemiringan huruf digital */
+ function colsFor(s){var pad=Math.ceil(Math.abs(s)*bh)+2,cw=ww+2*pad,cc=new Array(cw).fill(0),yy,xx;
+  for(yy=0;yy<bh;yy++){var off=Math.round(s*(yy-bh/2))+pad;for(xx=0;xx<ww;xx++){if(D[(ya+yy)*W+x0w+xx]){var k=xx+off;if(k>=0&&k<cw)cc[k]++}}}
+  return{cc:cc,pad:pad,cw:cw}}
+ function sq(a){var t=0;for(var q=0;q<a.length;q++)t+=a[q]*a[q];return t}
+ var bs=0,bb=sq(colsFor(0).cc);
+ for(var s=-.3;s<=.301;s+=.05){var qv=sq(colsFor(s).cc);if(qv>bb*1.03){bb=qv;bs=s}}
+ var cf=colsFor(bs),cc=cf.cc,cw=cf.cw,M=new Uint8Array(cw*bh);
+ (function(){var pad=cf.pad,yy,xx;for(yy=0;yy<bh;yy++){var off=Math.round(bs*(yy-bh/2))+pad;for(xx=0;xx<ww;xx++){if(D[(ya+yy)*W+x0w+xx]){var k=xx+off;if(k>=0&&k<cw)M[yy*cw+k]=1}}}})();
+ /* pisahkan per karakter */
+ var mg=Math.max(2,Math.round(bh*.07)),runs=[],kk=0;
+ while(kk<cw){
+  if(cc[kk]>=2){var ra=kk,rb=kk,gp=0;
+   while(kk<cw){if(cc[kk]>=2){rb=kk;gp=0}else{gp++;if(gp>mg)break}kk++}
+   runs.push({a:ra,b:rb})}
+  else kk++}
+ runs=runs.filter(function(r){return r.b-r.a+1>=3});
+ if(!runs.length)return null;
+ runs.forEach(function(r){var mn=bh,mxy=-1,yy,xx;
+  for(yy=0;yy<bh;yy++)for(xx=r.a;xx<=r.b;xx++){if(M[yy*cw+xx]){if(yy<mn)mn=yy;if(yy>mxy)mxy=yy;break}}
+  r.y0=mn;r.y1=mxy;r.w=r.b-r.a+1;r.h=mxy-mn+1;
+  r.dot=(r.h<=bh*.3&&r.y0>=bh*.55)});
+ var wide=runs.filter(function(r){return!r.dot&&r.w>=bh*.38}).map(function(r){return r.w}).sort(function(a,b){return a-b});
+ var Wref=wide.length?wide[Math.floor(wide.length/2)]:Math.round(bh*.55);
+ function seg(ca,cb,x0f,x1f,y0f,y1f){var cwid=cb-ca+1,xa=Math.round(ca+x0f*cwid),xb=Math.max(xa,Math.round(ca+x1f*cwid)-1),
+  yA=Math.round(y0f*bh),yB=Math.max(yA,Math.round(y1f*bh)-1),t=0,o=0,yy,xx;
+  for(yy=yA;yy<=yB;yy++)for(xx=xa;xx<=xb;xx++){if(xx<0||xx>=cw||yy>=bh)continue;t++;if(M[yy*cw+xx])o++}
+  return t&&o/t>.45?1:0}
+ var out='',dots=0,digs=0;
+ for(i=0;i<runs.length;i++){var r=runs[i];
+  if(r.dot){if(!digs||dots)return null;out+='.';dots++;continue}
+  if(r.w>Wref*1.5)return null;
+  var ca=r.a,cb=r.b;if(r.w<bh*.38){cb=r.b;ca=r.b-Wref+1}
+  var key2='',on=[seg(ca,cb,.2,.8,0,.14),seg(ca,cb,.78,1,.12,.45),seg(ca,cb,.78,1,.55,.88),seg(ca,cb,.2,.8,.86,1),seg(ca,cb,0,.22,.55,.88),seg(ca,cb,0,.22,.12,.45),seg(ca,cb,.2,.8,.43,.57)];
+  'abcdefg'.split('').forEach(function(l,j){if(on[j])key2+=l});
+  var dg=SEGT[key2];if(dg===undefined)return null;out+=dg;digs++}
+ if(!digs||digs>7)return null;
+ if(out.charAt(out.length-1)==='.')return null;
+ return{v:out}}
+/* ---- Pengenalan nama barang dari tulisan di kemasan ---- */
+var ALIAS={choco:['choco','chocolate','coklat','cokelat'],greentea:['greentea','matcha'],cheese:['cheese','keju'],strawberry:['strawberry','stroberi'],blueberry:['blueberry','bluberi'],goldenfill:['goldenfill','goldenfil'],tiramisu:['tiramisu','tiramisue']};
+function lev(a,b){var m=a.length,n=b.length,p=[],i,j;for(j=0;j<=n;j++)p[j]=j;
+ for(i=1;i<=m;i++){var pv=p[0];p[0]=i;for(j=1;j<=n;j++){var t=p[j];p[j]=Math.min(p[j]+1,p[j-1]+1,pv+(a.charAt(i-1)===b.charAt(j-1)?0:1));pv=t}}return p[n]}
+function fuzzyHas(comp,t){if(comp.indexOf(t)>=0)return true;
+ var tol=t.length>=8?2:t.length>=5?1:0;if(!tol)return false;
+ for(var L=t.length-1;L<=t.length+1;L++)for(var i=0;i+L<=comp.length;i++){if(lev(comp.substr(i,L),t)<=tol)return true}
+ return false}
+function toks(n){return String(n).toLowerCase().split(/[^a-z]+/).filter(function(w){return w.length>=3})}
+function matchItem(text){
+ var comp=String(text||'').toLowerCase().replace(/[^a-z]/g,'');if(comp.length<4)return null;
+ var cnt={};S.items.forEach(function(it){toks(it.nama).forEach(function(t){cnt[t]=(cnt[t]||0)+1})});
+ var rs=S.items.map(function(it){var ts=toks(it.nama),tot=0,got=0;
+  ts.forEach(function(t){var wt=1/cnt[t];tot+=wt;if((ALIAS[t]||[t]).some(function(v){return fuzzyHas(comp,v)}))got+=wt});
+  return{it:it,s:tot?got/tot:0}}).sort(function(a,b){return b.s-a.s});
+ var b=rs[0];if(!b||b.s<=0)return null;
+ b.ok=b.s>=.6&&(!rs[1]||b.s-rs[1].s>=.15);return b}
+function nameCanvas(im,rot){
+ var sw=im.naturalWidth||im.width,sh=im.naturalHeight||im.height,s=Math.min(1,1400/Math.max(sw,sh)),w=Math.round(sw*s),h=Math.round(sh*s),
+ c=document.createElement('canvas'),sp=rot===90||rot===270;c.width=sp?h:w;c.height=sp?w:h;
+ var x=c.getContext('2d');x.translate(c.width/2,c.height/2);x.rotate(rot*Math.PI/180);x.drawImage(im,-w/2,-h/2,w,h);return c}
+function detectItem(im,prog,alive){
+ return getOcr().then(function(w){
+  var rots=[0,90,270],k=0,best=null;
+  function next(){
+   if(k>=rots.length||!alive())return Promise.resolve(best&&best.ok?best:null);
+   var r=rots[k++];prog('Membaca nama barang… ('+k+'/'+rots.length+')');
+   return w.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',tessedit_pageseg_mode:'11'})
+   .then(function(){return w.recognize(nameCanvas(im,r))}).then(function(res){
+    var m=matchItem(res.data&&res.data.text);
+    if(m&&(!best||m.s>best.s))best=m;
+    if(best&&best.ok)return best;
+    return next()})}
+  return next()})}
+/* ---- Dialog scan: pilih barang + angka, ditulis otomatis ---- */
+function camStart(it,pi){camCtx={it:it,f:F[+pi]||F[curI]};var inp=$('camIn');inp.value='';inp.click()}
+$('bScan').onclick=function(){camCtx={it:null,f:F[curI]};var inp=$('camIn');inp.value='';inp.click()};
 $('camIn').addEventListener('change',function(){var f=this.files&&this.files[0];if(f&&camCtx)camOpen(f)});
-$('fileIn').addEventListener('change',function(){var f=this.files&&this.files[0];if(f&&camCtx)camOpen(f)});
 function camOpen(file){
- var it=camCtx.it,uk=unitKind(it.sat),tok=++camTok,th=null;
- function alive(){return tok===camTok}
- function prog(t){if(alive()&&$('cst'))$('cst').textContent=t}
- openM('<h3>📷 Foto Timbangan</h3><div class="ml" style="margin-bottom:8px"><b>'+esc(it.nama)+'</b></div>'+
-  '<div class="f"><label>Dicatat ke</label><select id="cf">'+FL.map(function(l,j){return'<option value="'+F[j]+'"'+(F[j]===camCtx.f?' selected':'')+'>'+l+'</option>'}).join('')+'</select></div>'+
+ var it0=camCtx.it,f0=camCtx.f,tok=++camTok,th=null,ap=null,touched=!!it0;
+ function alive(){return tok===camTok&&!!$('cst')}
+ function prog(t){if(alive())$('cst').textContent=t}
+ function curIt(){var id=$('ci').value;return S.items.filter(function(x){return x.id===id})[0]||null}
+ openM('<h3>📷 Scan Timbangan</h3>'+
+  '<div class="f"><label>Barang</label><select id="ci"><option value="">— pilih barang —</option>'+S.items.map(function(x){return'<option value="'+esc(x.id)+'"'+(it0&&it0.id===x.id?' selected':'')+'>'+esc(x.nama)+'</option>'}).join('')+'</select></div>'+
+  '<div class="f"><label>Dicatat ke</label><select id="cf">'+FL.map(function(l,j){return'<option value="'+F[j]+'"'+(F[j]===f0?' selected':'')+'>'+l+'</option>'}).join('')+'</select></div>'+
   '<div class="cimgw"><img id="cimg" alt="Foto timbangan"></div>'+
   '<div class="hint" id="cst" style="margin:6px 0 10px">Memproses foto…</div>'+
-  '<div class="f"><label>Angka di timbangan (periksa, bisa diedit)</label><input id="cv" inputmode="decimal" autocomplete="off" placeholder="0"></div>'+
-  (uk?'<div class="f"><label>Satuan di layar timbangan</label><select id="cu"><option value="g">Gram (g)</option><option value="kg">Kilogram (kg)</option></select></div>':'')+
+  '<div class="f"><label>Angka di timbangan (otomatis, bisa diedit)</label><input id="cv" inputmode="decimal" autocomplete="off" placeholder="0"></div>'+
+  '<div class="f"><label>Satuan di layar timbangan</label><select id="cu"><option value="g">Gram (g)</option><option value="kg">Kilogram (kg)</option></select></div>'+
   '<div class="hint" id="cp" style="margin:0 0 8px"></div><div class="er" id="ce"></div>'+
-  '<div class="bt"><button id="cx">Batal</button><button id="cr">Ganti foto</button><button class="p" id="co">Simpan angka</button></div>');
- if(uk)$('cu').value=uk==='kg'?'kg':'g';
- function conv(){var v=parseFloat(String($('cv').value).replace(',','.'));if(isNaN(v))return null;var u=$('cu')?$('cu').value:'';
+  '<div class="bt"><button id="cx">Batal</button><button id="cr">Foto ulang</button><button class="p" id="co">Simpan</button></div>');
+ function conv(){var v=parseFloat(String($('cv').value).replace(',','.'));if(isNaN(v))return null;
+  var x=curIt(),uk=x?unitKind(x.sat):'',u=$('cu').value;
   if(uk==='g'&&u==='kg')v*=1000;else if(uk==='kg'&&u==='g')v/=1000;return Math.round(v*1000)/1000}
- function upd(){var v=conv();$('cp').textContent=v==null?'':'Akan dicatat: '+fmt(v)+' '+it.sat}
+ function undo(){if(!ap)return;var d=(S.data[ap.k]||{})[ap.id];if(d){if(ap.had)d[ap.f]=ap.prev;else delete d[ap.f]}ap=null}
+ function apply(){undo();var x=curIt(),v=conv(),f=$('cf').value;
+  if(!x||v==null){$('cp').textContent=!x&&v!=null?'Pilih barang supaya angka tertulis otomatis.':'';render();return false}
+  var k=key();S.data[k]=S.data[k]||{};var d=S.data[k][x.id]=S.data[k][x.id]||{};
+  ap={k:k,id:x.id,f:f,had:Object.prototype.hasOwnProperty.call(d,f),prev:d[f]};d[f]=String(v);
+  $('cp').textContent='✓ Tertulis otomatis: '+x.nama+' = '+fmt(v)+' '+x.sat+' ('+FL[F.indexOf(f)]+')';
+  auto();render();return true}
  $('cv').oninput=function(){var v=this.value.replace(',','.').replace(/[^0-9.]/g,''),p=v.indexOf('.');
-  if(p>=0)v=v.slice(0,p+1)+v.slice(p+1).replace(/\./g,'');if(v!==this.value)this.value=v;upd()};
- if($('cu'))$('cu').onchange=upd;
- $('cx').onclick=function(){camTok++;closeM()};
- $('cr').onclick=function(){camTok++;camPick()};
+  if(p>=0)v=v.slice(0,p+1)+v.slice(p+1).replace(/\./g,'');if(v!==this.value)this.value=v;apply()};
+ $('cu').onchange=apply;$('cf').onchange=apply;$('ci').onchange=function(){touched=true;apply()};
+ $('cx').onclick=function(){camTok++;undo();save();closeM();render()};
+ $('cr').onclick=function(){camTok++;undo();save();closeM();render();var i=$('camIn');i.value='';i.click()};
  $('co').onclick=function(){
-  var v=conv();if(v===null){$('ce').textContent='Isi angka yang valid dulu.';return}
-  var f=$('cf').value,k=key();camTok++;
-  S.data[k]=S.data[k]||{};S.data[k][it.id]=S.data[k][it.id]||{};S.data[k][it.id][f]=String(v);
-  if(th){FO[k]=FO[k]||{};FO[k][it.id+'|'+f]={d:th.d,w:th.w,h:th.h,t:Date.now()};saveFoto()}
+  if(!ap&&!apply()){$('ce').textContent='Pilih barang dan isi angka yang valid dulu.';return}
+  camTok++;
+  if(th){var k=ap.k;FO[k]=FO[k]||{};FO[k][ap.id+'|'+ap.f]={d:th.d,w:th.w,h:th.h,t:Date.now()};saveFoto()}
   save();closeM();render();toast('Tercatat ✓')};
- loadImg(file).then(function(im){
-  th=thumbOf(im);if(!alive())return null;$('cimg').src=th.d;
-  prog('Menyiapkan pembaca angka… (pertama kali butuh internet, agak lama)');return im},
-  function(){prog('Foto tidak bisa dibuka. Ketik angkanya manual.');return null})
- .then(function(im){if(!im)return;
-  return ocrRun(im,prog,alive).then(function(b){
-   if(!alive())return;
-   if(b.v){$('cv').value=b.v;upd();prog('Angka terbaca. Periksa dulu, pastikan titik desimal sudah benar.')}
-   else{prog('Angka tidak terbaca otomatis. Ketik angka sesuai foto.');$('cv').focus()}},
-  function(){prog('Pembaca angka gagal dimuat (cek internet). Ketik angkanya manual, foto tetap tersimpan.');if($('cv'))$('cv').focus()})});
+ function setVal(v){$('cv').value=v;apply()}
+ loadImg(file).then(function(im){th=thumbOf(im);if(!alive())return null;$('cimg').src=th.d;return im},
+  function(){prog('Foto tidak bisa dibuka. Pilih barang dan ketik angkanya manual.');return null})
+ .then(function(im){if(!im||!alive())return;
+  prog('Membaca layar timbangan…');
+  var r=null;try{r=lcdRead(im)}catch(e){r=null}
+  var step1;
+  if(r){setVal(r.v);step1=Promise.resolve()}
+  else{prog('Menyiapkan pembaca angka… (pertama kali butuh internet, agak lama)');
+   step1=ocrRun(im,prog,alive,lcdBoxes(im)).then(function(b){if(!alive())return;if(b.v)setVal(b.v)})}
+  return step1.then(function(){
+   if(it0||!alive())return;
+   prog('Membaca nama barang… (pertama kali butuh internet, agak lama)');
+   return detectItem(im,prog,alive).then(function(m){
+    if(m&&!touched&&alive()){$('ci').value=m.it.id;apply()}},
+   function(){})})
+  .then(function(){if(!alive())return;
+   var x=curIt(),v=conv();
+   if(x&&v!=null)prog('Selesai terbaca dan tertulis otomatis. Periksa nama dan angka, lalu tekan Simpan.');
+   else if(!x&&v!=null)prog('Angka terbaca, tapi nama barang tidak dikenali. Pilih barang dari daftar.');
+   else if(x)prog('Angka tidak terbaca otomatis. Ketik angka sesuai foto.');
+   else prog('Nama dan angka tidak terbaca. Foto lebih dekat dan terang, atau isi manual.')})})
+ .catch(function(){prog('Pembaca gagal dimuat (cek internet). Isi manual, foto tetap tersimpan.')});
 }
 /* lampiran foto di laporan (PDF & pratinjau) */
 function lampList(d){var fo=FO[d.tgl]||{},o=[];
