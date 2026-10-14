@@ -290,6 +290,7 @@ table.rp{width:100%;border-collapse:collapse;font-size:10pt}
 <div id="boot"><i></i></div>
 <div class="ov" id="lg"><div class="md"><div class="lgm"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div><h3>Masuk</h3><p class="sub" id="lgN" style="margin-top:0">Masuk dengan akun cabang Anda.</p><div class="f"><label for="lgE">Email</label><input id="lgE" type="email" autocomplete="username" placeholder="nama@email.com"></div><div class="f"><label for="lgP">Kata sandi</label><input id="lgP" type="password" autocomplete="current-password" placeholder="••••••••"></div><div class="er" id="lgEr"></div><div class="bt"><button class="p" id="lgB" style="width:100%">Masuk</button></div></div></div>
 <input type="file" id="camIn" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="fileIn" accept="image/*" style="display:none">
 <div id="toast"></div>
 
 <script>
@@ -663,8 +664,14 @@ function ocrRun(im,prog,alive){
     return next()})}
   return next()})}
 function unitKind(s){s=String(s||'').trim().toLowerCase();return(s==='gram'||s==='g'||s==='gr')?'g':(s==='kg'||s==='kilogram')?'kg':''}
-function camStart(it,pi){camCtx={it:it,f:F[+pi]||F[curI]};var inp=$('camIn');inp.value='';inp.click()}
+function camStart(it,pi){camCtx={it:it,f:F[+pi]||F[curI]};camPick()}
+function camPick(){
+ openM('<h3>📷 Foto Timbangan</h3><p style="margin:0 0 14px"><b>'+esc(camCtx.it.nama)+'</b></p><div style="display:flex;flex-direction:column;gap:8px"><button class="p" id="pk1">📷 Ambil Foto</button><button id="pk2">🖼️ Pilih dari File / Galeri</button><button id="pk3">Batal</button></div>');
+ $('pk1').onclick=function(){closeM();$('camIn').value='';$('camIn').click()};
+ $('pk2').onclick=function(){closeM();$('fileIn').value='';$('fileIn').click()};
+ $('pk3').onclick=closeM}
 $('camIn').addEventListener('change',function(){var f=this.files&&this.files[0];if(f&&camCtx)camOpen(f)});
+$('fileIn').addEventListener('change',function(){var f=this.files&&this.files[0];if(f&&camCtx)camOpen(f)});
 function camOpen(file){
  var it=camCtx.it,uk=unitKind(it.sat),tok=++camTok,th=null;
  function alive(){return tok===camTok}
@@ -676,7 +683,7 @@ function camOpen(file){
   '<div class="f"><label>Angka di timbangan (periksa, bisa diedit)</label><input id="cv" inputmode="decimal" autocomplete="off" placeholder="0"></div>'+
   (uk?'<div class="f"><label>Satuan di layar timbangan</label><select id="cu"><option value="g">Gram (g)</option><option value="kg">Kilogram (kg)</option></select></div>':'')+
   '<div class="hint" id="cp" style="margin:0 0 8px"></div><div class="er" id="ce"></div>'+
-  '<div class="bt"><button id="cx">Batal</button><button id="cr">Foto ulang</button><button class="p" id="co">Simpan angka</button></div>');
+  '<div class="bt"><button id="cx">Batal</button><button id="cr">Ganti foto</button><button class="p" id="co">Simpan angka</button></div>');
  if(uk)$('cu').value=uk==='kg'?'kg':'g';
  function conv(){var v=parseFloat(String($('cv').value).replace(',','.'));if(isNaN(v))return null;var u=$('cu')?$('cu').value:'';
   if(uk==='g'&&u==='kg')v*=1000;else if(uk==='kg'&&u==='g')v/=1000;return Math.round(v*1000)/1000}
@@ -685,7 +692,7 @@ function camOpen(file){
   if(p>=0)v=v.slice(0,p+1)+v.slice(p+1).replace(/\./g,'');if(v!==this.value)this.value=v;upd()};
  if($('cu'))$('cu').onchange=upd;
  $('cx').onclick=function(){camTok++;closeM()};
- $('cr').onclick=function(){camTok++;closeM();$('camIn').value='';$('camIn').click()};
+ $('cr').onclick=function(){camTok++;camPick()};
  $('co').onclick=function(){
   var v=conv();if(v===null){$('ce').textContent='Isi angka yang valid dulu.';return}
   var f=$('cf').value,k=key();camTok++;
