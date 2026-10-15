@@ -521,8 +521,7 @@ $('bClr').onclick=function(){var f=F[curI],nm=FL[curI];
 /* halaman geser: Stok Awal | Stok Masuk | Stok Keluar */
 var paneDay='',tabTouched=false;
 function pickPane(){var t=key();if(paneDay===t||tabTouched)return;
- var d=S.data[t]||{},n=S.items.length,fa=0;S.items.forEach(function(it){if(filled(d[it.id],'a'))fa++});
- if(!n||fa*2<n)return;paneDay=t;setTab(1);
+ paneDay=t;setTab(2);
  setTimeout(function(){$('tb').scrollLeft=curI*$('tb').clientWidth},80)}
 function setTab(i,sc){i=Math.max(0,Math.min(2,i));curI=i;
  Array.prototype.forEach.call($('tabs').children,function(b,j){b.className='tab'+(j===i?' on':'')});
