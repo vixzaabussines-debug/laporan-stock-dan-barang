@@ -88,6 +88,25 @@ label{display:block;font-size:12px;font-weight:600;color:var(--mu);margin-bottom
 .hb .no{width:28px;height:28px;border-radius:50%;background:var(--pr);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center}
 .hb b{font-weight:600;font-size:15px;min-width:0;word-break:break-word}
 .hb button{min-height:34px;width:36px;padding:0;color:var(--dg)}
+.cimgw{position:relative}
+.cimgw.scanning::after{content:"";position:absolute;left:0;right:0;top:-46px;height:46px;background:linear-gradient(180deg,transparent,rgba(59,130,246,.42));border-bottom:2px solid rgba(96,165,250,.95);box-shadow:0 6px 18px rgba(59,130,246,.55);animation:scnl 1.5s linear infinite;pointer-events:none}
+@keyframes scnl{to{top:100%}}
+.lvw{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:3/4;max-height:58vh;margin:0 auto}
+.lvw video{width:100%;height:100%;object-fit:cover;display:block}
+.lvf{position:absolute;inset:14% 9%;pointer-events:none}
+.lvf i{position:absolute;width:28px;height:28px;border:3px solid #fff;transition:border-color .2s}
+.lvf i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0;border-radius:10px 0 0 0}
+.lvf i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0;border-radius:0 10px 0 0}
+.lvf i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0;border-radius:0 0 0 10px}
+.lvf i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 10px 0}
+.lvw.ok .lvf i{border-color:#22c55e}
+.lvl{position:absolute;left:9%;right:9%;top:14%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#60a5fa,transparent);box-shadow:0 0 16px 5px rgba(59,130,246,.6);animation:lvs 2.1s ease-in-out infinite alternate;pointer-events:none}
+.lvw.ok .lvl{background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 16px 5px rgba(34,197,94,.6)}
+@keyframes lvs{from{top:14%}to{top:86%}}
+.lvfl{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.lvw.fl .lvfl{animation:lvf .35s ease-out}
+@keyframes lvf{0%{opacity:.85}100%{opacity:0}}
+.lvt{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);max-width:92%;background:rgba(0,0,0,.6);color:#fff;font-size:13px;font-weight:600;padding:7px 14px;border-radius:99px;text-align:center;pointer-events:none}
 .hb small{display:block;font-size:12px;font-weight:500;color:var(--mu);margin-top:2px}
 .hbs{cursor:pointer;font-weight:700;font-size:15px;min-height:34px;display:flex;align-items:center}
 .mn{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center;margin-bottom:8px;font-size:14px;font-weight:600}
@@ -309,7 +328,7 @@ table.rp{width:100%;border-collapse:collapse;font-size:10pt}
     <div class="scan">
      <div class="scan-t"><span class="scan-i"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3"/><path d="M8 12h8"/></svg></span><div><b>Scan Timbangan</b><small>Foto layar timbangan, angka dan nama barang terisi otomatis</small></div></div>
      <div class="scan-b">
-      <button class="w" id="bScan"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.6"/></svg>Ambil Foto</button>
+      <button class="w" id="bScan"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.6"/></svg>Scan Kamera</button>
       <button id="bFile"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/></svg>Galeri</button>
      </div>
     </div>
@@ -561,7 +580,7 @@ $('hbClr').onclick=function(){if(!allHabis().length)return;if(!confirm('Kosongka
 
 /* modal */
 function openM(html){$('md').style.maxWidth='';$('md').innerHTML=html;$('ov').className='ov on'}
-function closeM(){$('ov').className='ov'}
+function closeM(){liveStop();camTok++;$('ov').className='ov'}
 $('ov').addEventListener('click',function(e){if(e.target===this)closeM()});
 function confirmM(t,m,ok,lb){openM('<h3>'+esc(t)+'</h3><p>'+esc(m)+'</p><div class="bt"><button id="mx">Batal</button><button class="p" id="mo">'+esc(lb||'Ya, hapus')+'</button></div>');
  $('mx').onclick=closeM;$('mo').onclick=function(){closeM();ok()}}
@@ -1024,19 +1043,49 @@ function detectItem(im,prog,alive){
     return next()})}
   return next()})}
 /* ---- Dialog scan: pilih barang + angka, ditulis otomatis ---- */
-function camStart(it,pi){camCtx={it:it,f:F[+pi]||F[curI]};var inp=$('camIn');inp.value='';inp.click()}
-$('bScan').onclick=function(){camCtx={it:null,f:F[curI]};var inp=$('camIn');inp.value='';inp.click()};
+/* ===== Scan kamera langsung: animasi scan, baca angka otomatis tanpa klik ===== */
+var liveS=null,liveT=0;
+function liveStop(){if(liveT){clearInterval(liveT);liveT=0}if(liveS){try{liveS.getTracks().forEach(function(t){t.stop()})}catch(e){}liveS=null}}
+function liveFallback(){var i=$('camIn');i.value='';i.click()}
+function liveOpen(){
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){liveFallback();return}
+ openM('<div class="scn"><div class="grab"></div><div class="scn-h"><h3>Scan Otomatis</h3><button class="x" id="lx0" aria-label="Tutup"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'+
+  '<div class="lvw" id="lvw"><video id="lvv" playsinline muted autoplay></video><div class="lvf"><i></i><i></i><i></i><i></i></div><div class="lvl"></div><div class="lvfl"></div><div class="lvt" id="lvt">Menyalakan kamera…</div></div>'+
+  '<div class="hint">Arahkan ke layar timbangan dan bahan. Angka yang stabil terbaca otomatis tanpa klik. Tidak ada timbangan di foto? Tekan Ambil.</div>'+
+  '<div class="scn-s" style="margin-top:12px"><button class="g" id="lvG">Galeri</button><button class="p" id="lvC">Ambil</button></div></div>');
+ var v=$('lvv'),w=$('lvw'),st=$('lvt'),tok=++camTok,last='',hold=0,t0=Date.now(),done=false;
+ function alive(){return tok===camTok&&!!$('lvv')}
+ function say(t){if(alive())st.textContent=t}
+ function grab(){var vw=v.videoWidth,vh=v.videoHeight;if(!vw||!vh)return null;var k=Math.min(1,1600/Math.max(vw,vh)),c=document.createElement('canvas');c.width=Math.round(vw*k);c.height=Math.round(vh*k);c.getContext('2d').drawImage(v,0,0,c.width,c.height);return c}
+ function shoot(c){if(done||!c||!alive())return;done=true;w.classList.add('fl');try{if(navigator.vibrate)navigator.vibrate(60)}catch(e){}
+  c.toBlob(function(b){if(!b){done=false;return}
+   liveStop();setTimeout(function(){if(tok!==camTok)return;camOpen(new File([b],'scan.jpg',{type:'image/jpeg'}))},220)},'image/jpeg',.92)}
+ function tick(){if(!alive()||done)return;var c=grab();if(!c)return;var r=null,lc=null;try{r=lcdRead(c)}catch(e){}
+  if(r&&r.v){w.classList.add('ok');if(r.v===last)hold++;else{last=r.v;hold=1}
+   say('Angka '+fixDec(r.v)+' terdeteksi, tahan… '+Math.min(hold,3)+'/3');if(hold>=3)shoot(c)}
+  else{w.classList.remove('ok');hold=0;last='';try{lc=lcdFind(c)}catch(e){}
+   say(lc?'Layar timbangan terlihat, dekatkan dan tahan stabil':(Date.now()-t0>9000?'Tanpa timbangan? Tekan Ambil untuk memotret bahan':'Arahkan kamera ke timbangan dan bahan…'))}}
+ $('lx0').onclick=function(){closeM()};
+ $('lvC').onclick=function(){var c=grab();if(c)shoot(c)};
+ $('lvG').onclick=function(){closeM();var i=$('fileIn');i.value='';i.click()};
+ navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false}).then(function(s){
+  if(!alive()){s.getTracks().forEach(function(t){t.stop()});return}
+  liveS=s;v.srcObject=s;var pr=v.play();if(pr&&pr.catch)pr.catch(function(){});
+  say('Arahkan kamera ke timbangan dan bahan…');liveT=setInterval(tick,650)},
+ function(){closeM();toast('Kamera tidak diizinkan. Memakai kamera bawaan.');liveFallback()})}
+function camStart(it,pi){camCtx={it:it,f:F[+pi]||F[curI]};liveOpen()}
+$('bScan').onclick=function(){camCtx={it:null,f:F[curI]};liveOpen()};
 $('camIn').addEventListener('change',function(){var f=this.files&&this.files[0];if(f&&camCtx)camOpen(f)});
 $('bFile').onclick=function(){camCtx={it:null,f:F[curI]};var inp=$('fileIn');inp.value='';inp.click()};
 $('fileIn').addEventListener('change',function(){var f=this.files&&this.files[0];if(f&&camCtx)camOpen(f)});
 function camOpen(file){
  var it0=camCtx.it,f0=camCtx.f,tok=++camTok,th=null,ap=null,touched=!!it0,aiErr='';
  function alive(){return tok===camTok&&!!$('cst')}
- function prog(t){if(alive()){var e=$('cst');e.textContent=t;e.className='cst'+(/…/.test(t)?' busy':/^Selesai/.test(t)?' ok':' warn')}}
+ function prog(t){if(alive()){var e=$('cst'),sw=document.querySelector('#md .cimgw');if(sw)sw.classList.toggle('scanning',/…/.test(t));e.textContent=t;e.className='cst'+(/…/.test(t)?' busy':/^Selesai/.test(t)?' ok':' warn')}}
  function curIt(){var id=$('ci').value;return S.items.filter(function(x){return x.id===id})[0]||null}
  openM('<div class="scn"><div class="grab"></div>'+
   '<div class="scn-h"><h3>Scan Timbangan</h3><button class="x" id="cx" aria-label="Tutup"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'+
-  '<div class="cimgw"><img id="cimg" alt="Foto timbangan"></div>'+
+  '<div class="cimgw scanning"><img id="cimg" alt="Foto timbangan"></div>'+
   '<div class="cst busy" id="cst">Memproses foto…</div>'+
   '<div class="f"><label>Barang</label><select id="ci"><option value="">— pilih barang —</option>'+S.items.map(function(x){return'<option value="'+esc(x.id)+'"'+(it0&&it0.id===x.id?' selected':'')+'>'+esc(x.nama)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>Angka di timbangan</label><div class="nm"><input id="cv" inputmode="decimal" autocomplete="off" placeholder="0"><select id="cu" aria-label="Satuan"><option value="g">gram</option><option value="kg">kg</option></select></div></div>'+
@@ -1059,14 +1108,14 @@ function camOpen(file){
  $('cu').onchange=apply;$('cf').onchange=apply;$('ci').onchange=function(){touched=true;apply()};
  $('cseg').onclick=function(e){var bt=e.target.closest('button');if(!bt)return;$('cf').value=bt.getAttribute('data-v');Array.prototype.forEach.call(this.children,function(c){c.className=c===bt?'on':''});apply()};
  $('cx').onclick=function(){camTok++;undo();save();closeM();render()};
- $('cr').onclick=function(){camTok++;undo();save();closeM();render();var i=$('camIn');i.value='';i.click()};
+ $('cr').onclick=function(){camTok++;undo();save();closeM();render();liveOpen()};
  $('cg').onclick=function(){camTok++;undo();save();closeM();render();var i=$('fileIn');i.value='';i.click()};
  $('co').onclick=function(){
   if(!ap&&!apply()){$('ce').textContent='Pilih barang dan isi angka yang valid dulu.';return}
   camTok++;
   if(th){var k=ap.k;FO[k]=FO[k]||{};FO[k][ap.id+'|'+ap.f]={d:th.d,w:th.w,h:th.h,t:Date.now()};saveFoto()}
   save();closeM();render();toast('Tercatat ✓')};
- function fixDec(v){v=String(v==null?'':v).trim();if($('cu').value==='kg')return v;var d=v.replace(/[^0-9]/g,'');return /^\d{4}$/.test(d)?d.slice(0,3)+'.'+d.slice(3):v}
+ function fixDec(v){v=String(v==null?'':v).trim();var cu=$('cu');if(cu&&cu.value==='kg')return v;var d=v.replace(/[^0-9]/g,'');return /^\d{4}$/.test(d)?d.slice(0,3)+'.'+d.slice(3):v}
  function setVal(v){$('cv').value=fixDec(v);apply()}
  loadImg(file).then(function(im){th=thumbOf(im);if(!alive())return null;$('cimg').src=th.d;return im},
   function(){prog('Foto tidak bisa dibuka. Pilih barang dan ketik angkanya manual.');return null})
