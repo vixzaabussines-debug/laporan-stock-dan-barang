@@ -724,7 +724,7 @@ function aiRead(im){
 3) Cocokkan tulisan di kemasan/label (bisa miring/terputar, dan sebagian terpotong) dengan daftar barang berikut, pilih id yang paling cocok. Perhatikan merek, rasa, dan varian. Jika tidak ada tulisan (bahan curah di wadah), kenali dari WARNA, TEKSTUR, dan WADAH sesuai [ciri visual] di daftar. Bedakan dengan hati-hati: gula putih (kristal putih bersih) vs brown sugar (kristal kasar kecokelatan) vs cinnamon sugar (serbuk halus berbintik cokelat kemerahan); butter cair (kuning keemasan pekat) vs maple syrup (cokelat tua di botol squeeze).
 Daftar barang:
 `+list+`
-Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, atau kosong>","satuan":"g atau kg atau kosong"}. Jika foto hanya menampilkan bahan tanpa timbangan, isi angka kosong tetapi tetap isi id. Jangan menebak: jika tidak yakin, isi null atau kosong.`;
+Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, atau kosong>","satuan":"g atau kg atau kosong"}. Jika berat terbaca 4 digit tanpa titik (mis. 3344), tulis dengan titik sebelum digit terakhir (334.4). Jika foto hanya menampilkan bahan tanpa timbangan, isi angka kosong tetapi tetap isi id. Jangan menebak: jika tidak yakin, isi null atau kosong.`;
  var tried={},errs=[],lo='';try{lo=localStorage.getItem(AIM)||''}catch(e){}
  var order=GROQ_MODELS.slice();if(lo){order=order.filter(function(x){return x!==lo});order.unshift(lo)}
  function run(list,i){
@@ -965,7 +965,8 @@ function camOpen(file){
   camTok++;
   if(th){var k=ap.k;FO[k]=FO[k]||{};FO[k][ap.id+'|'+ap.f]={d:th.d,w:th.w,h:th.h,t:Date.now()};saveFoto()}
   save();closeM();render();toast('Tercatat ✓')};
- function setVal(v){$('cv').value=v;apply()}
+ function fixDec(v){v=String(v==null?'':v).trim();return /^\d{4}$/.test(v)?v.slice(0,3)+'.'+v.slice(3):v}
+ function setVal(v){$('cv').value=fixDec(v);apply()}
  loadImg(file).then(function(im){th=thumbOf(im);if(!alive())return null;$('cimg').src=th.d;return im},
   function(){prog('Foto tidak bisa dibuka. Pilih barang dan ketik angkanya manual.');return null})
  .then(function(im){if(!im||!alive())return;
