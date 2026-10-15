@@ -724,7 +724,7 @@ function aiRead(im){
 3) Cocokkan tulisan di kemasan/label (bisa miring/terputar, dan sebagian terpotong) dengan daftar barang berikut, pilih id yang paling cocok. Perhatikan merek, rasa, dan varian. Jika tidak ada tulisan (bahan curah di wadah), kenali dari WARNA, TEKSTUR, dan WADAH sesuai [ciri visual] di daftar. Bedakan dengan hati-hati: gula putih (kristal putih bersih) vs brown sugar (kristal kasar kecokelatan) vs cinnamon sugar (serbuk halus berbintik cokelat kemerahan); butter cair (kuning keemasan pekat) vs maple syrup (cokelat tua di botol squeeze).
 Daftar barang:
 `+list+`
-Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, atau kosong>","satuan":"g atau kg atau kosong"}. Jika berat terbaca 4 digit tanpa titik (mis. 3344), tulis dengan titik sebelum digit terakhir (334.4). Jika foto hanya menampilkan bahan tanpa timbangan, isi angka kosong tetapi tetap isi id. Jangan menebak: jika tidak yakin, isi null atau kosong.`;
+Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, atau kosong>","satuan":"g atau kg atau kosong"}. Jika berat terbaca 4 digit tanpa titik (mis. 3344), tulis dengan titik sebelum digit terakhir (334.4). Jika foto hanya menampilkan bahan tanpa timbangan atau tanpa tulisan, isi angka kosong dan TETAP pilih id bahan yang paling mirip dari [ciri visual] (pengguna akan memeriksa ulang); isi id null hanya bila jelas bukan salah satu barang di daftar. Untuk angka timbangan jangan menebak: jika tidak terbaca jelas, kosongkan.`;
  var tried={},errs=[],lo='';try{lo=localStorage.getItem(AIM)||''}catch(e){}
  var order=GROQ_MODELS.slice();if(lo){order=order.filter(function(x){return x!==lo});order.unshift(lo)}
  function run(list,i){
@@ -741,7 +741,7 @@ Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, at
 function visHint(n){n=String(n||'').toLowerCase();
  if(/maple|mapple|syrup|sirup/.test(n))return'cairan cokelat tua/amber kental, biasanya di botol squeeze putih transparan (tutup kerucut) di atas timbangan';
  if(/cinn?amm?on/.test(n))return'serbuk/remah halus putih-krem dengan bintik cokelat kemerahan (kayu manis) tersebar, di wadah plastik, tekstur seperti pasir halus';
- if(/brown/.test(n))return'butiran gula kasar, lebih besar dari gula pasir, berwarna kuning kecokelatan/karamel, di wadah plastik, tanpa bintik kayu manis';
+ if(/brown/.test(n))return'butiran gula kasar berkilau, lebih besar dari gula pasir, berwarna kuning-oranye kecokelatan/karamel yang merata, di wadah plastik persegi panjang (kadang ada noda gelap kecil), tanpa bintik kayu manis dan tanpa timbangan';
  if(/gula\s*putih|white\s*sugar|^gula$/.test(n))return'butiran kristal gula halus berwarna putih bersih/bening, sering di loyang aluminium atau wadah, tanpa warna cokelat';
  if(/butter|mentega/.test(n))return'cairan kental kuning keemasan pekat sampai oranye (butter cair/leleh, mirip kocokan telur), di wadah plastik bening, sering ada kuas silikon; atau balok butter kuning pucat';
  return''}
