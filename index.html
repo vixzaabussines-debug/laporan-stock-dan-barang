@@ -721,7 +721,7 @@ function aiRead(im){
  var prompt=`Foto ini berisi timbangan digital, kemasan bahan, dan/atau wadah berisi bahan curah (loyang, toples, botol squeeze) yang sering TANPA label. Tugas:
 1) Baca angka BERAT di layar timbangan. Layar biasanya terbagi dua: kiri timer (mis. 0:00), kanan berat (mis. 453.2). Ambil yang berat (kanan), perhatikan titik desimalnya. Jika ada gambar kedua, itu potongan layar timbangan: baca angka dari situ dengan teliti, digit demi digit.
 2) Baca satuannya (g atau kg) bila terlihat.
-3) Cocokkan tulisan di kemasan/label (bisa miring/terputar, dan sebagian terpotong) dengan daftar barang berikut, pilih id yang paling cocok. Perhatikan merek, rasa, dan varian. Jika tidak ada tulisan (bahan curah di wadah), kenali dari WARNA, TEKSTUR, dan WADAH sesuai [ciri visual] di daftar. Bedakan dengan hati-hati: gula putih (kristal putih bersih) vs brown sugar (kristal kasar kecokelatan) vs cinnamon sugar (serbuk halus berbintik cokelat kemerahan); butter cair (kuning keemasan pekat) vs maple syrup (cokelat tua di botol squeeze).
+3) Cocokkan tulisan di kemasan/label (bisa miring/terputar, dan sebagian terpotong) dengan daftar barang berikut, pilih id yang paling cocok. Perhatikan merek, rasa, dan varian. Jika tidak ada tulisan (bahan curah di wadah), kenali dari WARNA, TEKSTUR, dan WADAH sesuai [ciri visual] di daftar. Tub berlabel/bergambar kue bertuliskan Goldenfil/Goldenfill adalah Goldenfill sesuai rasanya, sedangkan toples cokelat polos tanpa label cetak berisi pasta cokelat gelap adalah Nutella. Bedakan dengan hati-hati: gula putih (kristal putih bersih) vs brown sugar (kristal kasar kecokelatan) vs cinnamon sugar (serbuk halus berbintik cokelat kemerahan); butter cair (kuning keemasan pekat) vs maple syrup (cokelat tua di botol squeeze).
 Daftar barang:
 `+list+`
 Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, atau kosong>","satuan":"g atau kg atau kosong"}. Jika berat terbaca 4 digit tanpa titik (mis. 3344), tulis dengan titik sebelum digit terakhir (334.4). Jika foto hanya menampilkan bahan tanpa timbangan atau tanpa tulisan, isi angka kosong dan TETAP pilih id bahan yang paling mirip dari [ciri visual] (pengguna akan memeriksa ulang); isi id null hanya bila jelas bukan salah satu barang di daftar. Untuk angka timbangan jangan menebak: jika tidak terbaca jelas, kosongkan.`;
@@ -739,6 +739,7 @@ Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, at
   return aiDiscover().then(function(more){more=more.filter(function(x){return!tried[x]}).slice(0,3);if(!more.length)throw e;return run(more,0)})})}
 /* ciri visual bahan curah (tanpa label) supaya AI bisa mengenali dari isi wadahnya */
 function visHint(n){n=String(n||'').toLowerCase();
+ if(/nutella|nutela/.test(n))return'pasta cokelat tua kental di toples/ember plastik polos tanpa label cetak, tutup cokelat tua keabu-abuan (kadang tampak berkilau/bernoda), isi cokelat gelap pekat; BUKAN tub bergambar kue berlabel Goldenfil dan BUKAN cairan di botol squeeze';
  if(/maple|mapple|syrup|sirup/.test(n))return'cairan cokelat tua/amber kental, biasanya di botol squeeze putih transparan (tutup kerucut) di atas timbangan';
  if(/cinn?amm?on/.test(n))return'serbuk/remah halus putih-krem dengan bintik cokelat kemerahan (kayu manis) tersebar, di wadah plastik, tekstur seperti pasir halus';
  if(/brown/.test(n))return'butiran gula kasar berkilau, lebih besar dari gula pasir, berwarna kuning-oranye kecokelatan/karamel yang merata, di wadah plastik persegi panjang (kadang ada noda gelap kecil), tanpa bintik kayu manis dan tanpa timbangan';
@@ -889,7 +890,7 @@ function lcdRead(im){
  if(out.charAt(out.length-1)==='.')return null;
  return{v:out}}
 /* ---- Pengenalan nama barang dari tulisan di kemasan ---- */
-var ALIAS={choco:['choco','chocolate','coklat','cokelat'],greentea:['greentea','matcha'],cheese:['cheese','keju'],strawberry:['strawberry','stroberi'],blueberry:['blueberry','bluberi'],goldenfill:['goldenfill','goldenfil'],tiramisu:['tiramisu','tiramisue'],maple:['maple','mapple','mapel'],syrup:['syrup','sirup','sirop'],brown:['brown','browm'],cinnamon:['cinnamon','cinammon','cinamon','kayumanis'],butter:['butter','buter','mentega'],putih:['putih','white']};
+var ALIAS={choco:['choco','chocolate','coklat','cokelat'],greentea:['greentea','matcha'],cheese:['cheese','keju'],strawberry:['strawberry','stroberi'],blueberry:['blueberry','bluberi'],goldenfill:['goldenfill','goldenfil'],tiramisu:['tiramisu','tiramisue'],maple:['maple','mapple','mapel'],syrup:['syrup','sirup','sirop'],brown:['brown','browm'],cinnamon:['cinnamon','cinammon','cinamon','kayumanis'],butter:['butter','buter','mentega'],putih:['putih','white'],nutella:['nutella','nutela','nutelah']};
 function lev(a,b){var m=a.length,n=b.length,p=[],i,j;for(j=0;j<=n;j++)p[j]=j;
  for(i=1;i<=m;i++){var pv=p[0];p[0]=i;for(j=1;j<=n;j++){var t=p[j];p[j]=Math.min(p[j]+1,p[j-1]+1,pv+(a.charAt(i-1)===b.charAt(j-1)?0:1));pv=t}}return p[n]}
 function fuzzyHas(comp,t){if(comp.indexOf(t)>=0)return true;
