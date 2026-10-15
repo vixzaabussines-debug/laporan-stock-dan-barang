@@ -1051,7 +1051,7 @@ function liveOpen(){
  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){liveFallback();return}
  openM('<div class="scn"><div class="grab"></div><div class="scn-h"><h3>Scan Otomatis</h3><button class="x" id="lx0" aria-label="Tutup"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'+
   '<div class="lvw" id="lvw"><video id="lvv" playsinline muted autoplay></video><div class="lvf"><i></i><i></i><i></i><i></i></div><div class="lvl"></div><div class="lvfl"></div><div class="lvt" id="lvt">Menyalakan kamera…</div></div>'+
-  '<div class="hint">Arahkan ke layar timbangan dan bahan. Angka yang stabil terbaca otomatis tanpa klik. Tidak ada timbangan di foto? Tekan Ambil.</div>'+
+  '<div class="hint">Arahkan ke layar timbangan dan bahan. Saat layar timbangan terlihat jelas dan stabil, foto terambil otomatis. Tidak ada timbangan di foto? Tekan Ambil.</div>'+
   '<div class="scn-s" style="margin-top:12px"><button class="g" id="lvG">Galeri</button><button class="p" id="lvC">Ambil</button></div></div>');
  var v=$('lvv'),w=$('lvw'),st=$('lvt'),tok=++camTok,last='',hold=0,t0=Date.now(),done=false;
  function alive(){return tok===camTok&&!!$('lvv')}
@@ -1060,18 +1060,22 @@ function liveOpen(){
  function shoot(c){if(done||!c||!alive())return;done=true;w.classList.add('fl');try{if(navigator.vibrate)navigator.vibrate(60)}catch(e){}
   c.toBlob(function(b){if(!b){done=false;return}
    liveStop();setTimeout(function(){if(tok!==camTok)return;camOpen(new File([b],'scan.jpg',{type:'image/jpeg'}))},220)},'image/jpeg',.92)}
- function tick(){if(!alive()||done)return;var c=grab();if(!c)return;var r=null,lc=null;try{r=lcdRead(c)}catch(e){}
-  if(r&&r.v){w.classList.add('ok');if(r.v===last)hold++;else{last=r.v;hold=1}
-   say('Angka '+fixDec(r.v)+' terdeteksi, tahan… '+Math.min(hold,3)+'/3');if(hold>=3)shoot(c)}
-  else{w.classList.remove('ok');hold=0;last='';try{lc=lcdFind(c)}catch(e){}
-   say(lc?'Layar timbangan terlihat, dekatkan dan tahan stabil':(Date.now()-t0>9000?'Tanpa timbangan? Tekan Ambil untuk memotret bahan':'Arahkan kamera ke timbangan dan bahan…'))}}
+ var prev=null;
+ function tick(){if(!alive()||done)return;var c=grab();if(!c)return;var lc=null;try{lc=lcdFind(c)}catch(e){}
+  if(lc){w.classList.add('ok');
+   var big=lc.w>=c.width*.1,same=prev&&Math.abs(lc.x-prev.x)<c.width*.05&&Math.abs(lc.y-prev.y)<c.height*.05;
+   prev=lc;hold=same?hold+1:1;
+   if(!big){hold=0;say('Layar timbangan terlihat, dekatkan sedikit lagi')}
+   else{say('Timbangan terdeteksi, tahan… '+Math.min(hold,2)+'/2');if(hold>=2)shoot(c)}}
+  else{w.classList.remove('ok');prev=null;hold=0;
+   say(Date.now()-t0>8000?'Tanpa timbangan? Tekan Ambil untuk memotret bahan':'Arahkan kamera ke layar timbangan…')}}
  $('lx0').onclick=function(){closeM()};
  $('lvC').onclick=function(){var c=grab();if(c)shoot(c)};
  $('lvG').onclick=function(){closeM();var i=$('fileIn');i.value='';i.click()};
  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false}).then(function(s){
   if(!alive()){s.getTracks().forEach(function(t){t.stop()});return}
-  liveS=s;v.srcObject=s;var pr=v.play();if(pr&&pr.catch)pr.catch(function(){});
-  say('Arahkan kamera ke timbangan dan bahan…');liveT=setInterval(tick,650)},
+  liveS=s;v.srcObject=s;var pr=v.play();if(pr&&pr.catch)pr.catch(function(){});try{var tk=s.getVideoTracks()[0];if(tk&&tk.applyConstraints)tk.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(function(){})}catch(e){}
+  say('Arahkan kamera ke timbangan dan bahan…');liveT=setInterval(tick,400)},
  function(){closeM();toast('Kamera tidak diizinkan. Memakai kamera bawaan.');liveFallback()})}
 function camStart(it,pi){camCtx={it:it,f:F[+pi]||F[curI]};liveOpen()}
 $('bScan').onclick=function(){camCtx={it:null,f:F[curI]};liveOpen()};
