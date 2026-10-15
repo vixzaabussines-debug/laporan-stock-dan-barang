@@ -717,14 +717,14 @@ function aiRead(im){
  c.width=Math.max(1,Math.round(sw*sc));c.height=Math.max(1,Math.round(sh*sc));aiCtx(c).drawImage(im,0,0,c.width,c.height);
  var urls=[aiJpg(c)],ids={};
  try{var bx=lcdFind(im);if(bx){var mx=bx.w*.1,my=bx.h*.15,x0=Math.max(0,bx.x-mx),y0=Math.max(0,bx.y-my),cw=Math.min(sw-x0,bx.w+2*mx),ch=Math.min(sh-y0,bx.h+2*my),k=Math.min(4,1600/cw),c2=document.createElement('canvas');c2.width=Math.max(1,Math.round(cw*k));c2.height=Math.max(1,Math.round(ch*k));aiCtx(c2).drawImage(im,x0,y0,cw,ch,0,0,c2.width,c2.height);urls.push(aiJpg(c2))}}catch(e){}
- var list=S.items.map(function(x){ids[x.id]=1;return x.id+' = '+x.nama}).join('\n');
- var prompt=`Foto ini berisi timbangan digital dan/atau kemasan bahan. Tugas:
+ var list=S.items.map(function(x){ids[x.id]=1;var h=visHint(x.nama);return x.id+' = '+x.nama+(h?' [ciri visual: '+h+']':'')}).join('\n');
+ var prompt=`Foto ini berisi timbangan digital, kemasan bahan, dan/atau wadah berisi bahan curah (loyang, toples, botol squeeze) yang sering TANPA label. Tugas:
 1) Baca angka BERAT di layar timbangan. Layar biasanya terbagi dua: kiri timer (mis. 0:00), kanan berat (mis. 453.2). Ambil yang berat (kanan), perhatikan titik desimalnya. Jika ada gambar kedua, itu potongan layar timbangan: baca angka dari situ dengan teliti, digit demi digit.
 2) Baca satuannya (g atau kg) bila terlihat.
-3) Cocokkan tulisan di kemasan/label (bisa miring/terputar, dan sebagian terpotong) dengan daftar barang berikut, pilih id yang paling cocok. Perhatikan merek, rasa, dan varian.
+3) Cocokkan tulisan di kemasan/label (bisa miring/terputar, dan sebagian terpotong) dengan daftar barang berikut, pilih id yang paling cocok. Perhatikan merek, rasa, dan varian. Jika tidak ada tulisan (bahan curah di wadah), kenali dari WARNA, TEKSTUR, dan WADAH sesuai [ciri visual] di daftar. Bedakan dengan hati-hati: gula putih (kristal putih bersih) vs brown sugar (kristal kasar kecokelatan) vs cinnamon sugar (serbuk halus berbintik cokelat kemerahan); butter cair (kuning keemasan pekat) vs maple syrup (cokelat tua di botol squeeze).
 Daftar barang:
 `+list+`
-Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, atau kosong>","satuan":"g atau kg atau kosong"}. Jangan menebak: jika tidak yakin, isi null atau kosong.`;
+Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, atau kosong>","satuan":"g atau kg atau kosong"}. Jika foto hanya menampilkan bahan tanpa timbangan, isi angka kosong tetapi tetap isi id. Jangan menebak: jika tidak yakin, isi null atau kosong.`;
  var tried={},errs=[],lo='';try{lo=localStorage.getItem(AIM)||''}catch(e){}
  var order=GROQ_MODELS.slice();if(lo){order=order.filter(function(x){return x!==lo});order.unshift(lo)}
  function run(list,i){
@@ -737,6 +737,14 @@ Jawab HANYA JSON: {"id":"<id atau null>","angka":"<angka desimal pakai titik, at
  return run(order,0).catch(function(e){
   if(e.fatal)throw e;
   return aiDiscover().then(function(more){more=more.filter(function(x){return!tried[x]}).slice(0,3);if(!more.length)throw e;return run(more,0)})})}
+/* ciri visual bahan curah (tanpa label) supaya AI bisa mengenali dari isi wadahnya */
+function visHint(n){n=String(n||'').toLowerCase();
+ if(/maple|mapple|syrup|sirup/.test(n))return'cairan cokelat tua/amber kental, biasanya di botol squeeze putih transparan (tutup kerucut) di atas timbangan';
+ if(/cinn?amm?on/.test(n))return'serbuk/remah halus putih-krem dengan bintik cokelat kemerahan (kayu manis) tersebar, di wadah plastik, tekstur seperti pasir halus';
+ if(/brown/.test(n))return'butiran gula kasar, lebih besar dari gula pasir, berwarna kuning kecokelatan/karamel, di wadah plastik, tanpa bintik kayu manis';
+ if(/gula\s*putih|white\s*sugar|^gula$/.test(n))return'butiran kristal gula halus berwarna putih bersih/bening, sering di loyang aluminium atau wadah, tanpa warna cokelat';
+ if(/butter|mentega/.test(n))return'cairan kental kuning keemasan pekat sampai oranye (butter cair/leleh, mirip kocokan telur), di wadah plastik bening, sering ada kuas silikon; atau balok butter kuning pucat';
+ return''}
 /* ===== Foto timbangan + baca angka otomatis (OCR) ===== */
 var FK='lsb:foto',FO={},camCtx=null,camTok=0,ocrP=null;
 try{FO=JSON.parse(localStorage.getItem(FK)||'{}')||{}}catch(e){FO={}}
@@ -881,7 +889,7 @@ function lcdRead(im){
  if(out.charAt(out.length-1)==='.')return null;
  return{v:out}}
 /* ---- Pengenalan nama barang dari tulisan di kemasan ---- */
-var ALIAS={choco:['choco','chocolate','coklat','cokelat'],greentea:['greentea','matcha'],cheese:['cheese','keju'],strawberry:['strawberry','stroberi'],blueberry:['blueberry','bluberi'],goldenfill:['goldenfill','goldenfil'],tiramisu:['tiramisu','tiramisue']};
+var ALIAS={choco:['choco','chocolate','coklat','cokelat'],greentea:['greentea','matcha'],cheese:['cheese','keju'],strawberry:['strawberry','stroberi'],blueberry:['blueberry','bluberi'],goldenfill:['goldenfill','goldenfil'],tiramisu:['tiramisu','tiramisue'],maple:['maple','mapple','mapel'],syrup:['syrup','sirup','sirop'],brown:['brown','browm'],cinnamon:['cinnamon','cinammon','cinamon','kayumanis'],butter:['butter','buter','mentega'],putih:['putih','white']};
 function lev(a,b){var m=a.length,n=b.length,p=[],i,j;for(j=0;j<=n;j++)p[j]=j;
  for(i=1;i<=m;i++){var pv=p[0];p[0]=i;for(j=1;j<=n;j++){var t=p[j];p[j]=Math.min(p[j]+1,p[j-1]+1,pv+(a.charAt(i-1)===b.charAt(j-1)?0:1));pv=t}}return p[n]}
 function fuzzyHas(comp,t){if(comp.indexOf(t)>=0)return true;
