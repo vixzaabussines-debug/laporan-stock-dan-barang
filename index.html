@@ -361,7 +361,7 @@ table.rp{width:100%;border-collapse:collapse;font-size:10pt}
     <div class="hbt">STOCK HABIS</div>
     <div id="hbL"></div>
     <div class="row" style="margin-top:12px"><button class="g" id="hbCp" style="flex:1 1 0">Salin daftar</button><button class="d" id="hbClr" style="flex:1 1 0">Kosongkan</button></div>
-    <div class="hint">Barang masuk otomatis saat sisanya (Awal + Masuk − Keluar) di bawah batas minimum, lalu keluar sendiri setelah diisi ulang. Daftar manual per hari; hari berikutnya memuat daftar terakhir.</div>
+    <div class="hint">Barang masuk otomatis setelah Stok Keluar hari ini diisi dan sisanya (Awal + Masuk − Keluar) di bawah batas minimum, lalu keluar sendiri setelah diisi ulang. Daftar manual per hari; hari berikutnya memuat daftar terakhir.</div>
    </div>
    <div class="card">
     <details><summary class="hbs">Batas minimum per barang</summary>
@@ -434,6 +434,10 @@ var tm;function auto(){$('st').textContent='Menyimpan…';clearTimeout(tm);tm=se
 function toast(t){var e=$('toast');e.textContent=t;e.className='on';clearTimeout(toast.t);toast.t=setTimeout(function(){e.className=''},1800)}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function key(){return today()}
+/* Stok Masuk barang bersatuan gram diisi dalam KG; disimpan tetap dalam gram supaya hitungan sisa sama */
+function kgIn(it,f){return f==='m'&&unitKind(it.sat)==='g'}
+function toKgStr(g){var n=parseFloat(g);return isNaN(n)?String(g==null?'':g):String(Math.round(n*1000)/1e6)}
+function fromKgStr(v){var n=parseFloat(v);return isNaN(n)?'':String(Math.round(n*1e6)/1000)}
 function rec(id){var d=S.data[key()];return(d&&d[id])||{}}
 function num(v){var n=parseFloat(v);return isNaN(n)?0:n}
 function akhir(r){return Math.round((num(r.a)+num(r.m)-num(r.k))*1000)/1000}
@@ -459,7 +463,7 @@ function prefetchPrev(){
  if(!ps.length)return;
  Promise.all(ps).then(function(a){if(key()!==t)return;
   a.forEach(function(x){if(x&&!S.data[x.d]){S.data[x.d]=x.v;L.stok[x.d]=JSON.stringify(x.v)}});
-  var c=carryOver();if(c){auto();render();toast('Stok Awal diisi dari Stok Keluar hari sebelumnya ✓')}})}
+  var c=carryOver();if(c){auto();render();pickPane();toast('Stok Awal diisi dari Stok Keluar hari sebelumnya ✓')}})}
 function tglID(s){var p=s.split('-');if(p.length<3)return s;var d=new Date(+p[0],+p[1]-1,+p[2]);return d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
 
 var flt='all',curI=0,lockT=0,F=['a','m','k'],FL=['Stok Awal','Stok Masuk','Stok Keluar'];
@@ -479,7 +483,7 @@ function render(){
    if(flt==='f'&&!fl)return;if(flt==='e'&&fl)return;
    h+='<div class="it'+(fl?' fl':'')+'" data-id="'+it.id+'"><div class="no">'+(i+1)+'</div>'+
    '<button class="nmb" data-a="e" title="Ubah / hapus barang"><span>'+esc(it.nama)+'</span>'+PEN+'</button>'+
-   '<div class="qw"><div class="qt"><input inputmode="decimal" enterkeyhint="next" autocomplete="off" data-f="'+fk+'" value="'+(r[fk]==null?'':esc(r[fk]))+'" placeholder="0" aria-label="'+FL[p]+' '+esc(it.nama)+'"><span class="un">'+esc(it.sat)+'</span></div>'+camBtn(it.id,fk)+'</div></div>'});
+   '<div class="qw"><div class="qt"><input inputmode="decimal" enterkeyhint="next" autocomplete="off" data-f="'+fk+'" value="'+(r[fk]==null?'':esc(kgIn(it,fk)?toKgStr(r[fk]):r[fk]))+'" placeholder="0" aria-label="'+FL[p]+' '+esc(it.nama)+'"><span class="un">'+esc(kgIn(it,fk)?'Kg':it.sat)+'</span></div>'+camBtn(it.id,fk)+'</div></div>'});
   $('p'+p).innerHTML=h||'<div class="empty">'+m+'</div>'});
  stats();
 }
@@ -489,8 +493,9 @@ $('tb').addEventListener('input',function(e){
  if(p>=0)v=v.slice(0,p+1)+v.slice(p+1).replace(/\./g,'');
  if(v!==t.value)t.value=v;
  var row=t.closest('.it'),id=row.getAttribute('data-id'),k=key();
- S.data[k]=S.data[k]||{};S.data[k][id]=S.data[k][id]||{};S.data[k][id][f]=v;
- row.classList.toggle('fl',v!=='');stats();
+ var it0=S.items.filter(function(x){return x.id===id})[0];
+ S.data[k]=S.data[k]||{};S.data[k][id]=S.data[k][id]||{};S.data[k][id][f]=(it0&&kgIn(it0,f))?fromKgStr(v):v;
+ row.classList.toggle('fl',v!==''&&(!it0||!kgIn(it0,f)||fromKgStr(v)!==''));stats();
  auto();
 });
 $('tb').addEventListener('keydown',function(e){
@@ -514,12 +519,17 @@ $('bClr').onclick=function(){var f=F[curI],nm=FL[curI];
   save();render();toast('Isian dikosongkan')},'Ya, kosongkan')};
 
 /* halaman geser: Stok Awal | Stok Masuk | Stok Keluar */
+var paneDay='',tabTouched=false;
+function pickPane(){var t=key();if(paneDay===t||tabTouched)return;
+ var d=S.data[t]||{},n=S.items.length,fa=0;S.items.forEach(function(it){if(filled(d[it.id],'a'))fa++});
+ if(!n||fa*2<n)return;paneDay=t;setTab(1);
+ setTimeout(function(){$('tb').scrollLeft=curI*$('tb').clientWidth},80)}
 function setTab(i,sc){i=Math.max(0,Math.min(2,i));curI=i;
  Array.prototype.forEach.call($('tabs').children,function(b,j){b.className='tab'+(j===i?' on':'')});
  $('bClr').textContent='Kosongkan '+FL[i].toLowerCase();stats();
  if(!sc){lockT=Date.now()+600;var x=i*$('tb').clientWidth;try{$('tb').scrollTo({left:x,behavior:'smooth'})}catch(e){$('tb').scrollLeft=x}}}
-$('tabs').addEventListener('click',function(e){var b=e.target.closest('.tab');if(b)setTab(+b.getAttribute('data-i'))});
-$('tb').addEventListener('scroll',function(){if(Date.now()<lockT)return;var w=$('tb').clientWidth||1,i=Math.round($('tb').scrollLeft/w);if(i!==curI)setTab(i,true)});
+$('tabs').addEventListener('click',function(e){var b=e.target.closest('.tab');if(b){tabTouched=true;setTab(+b.getAttribute('data-i'))}});
+$('tb').addEventListener('scroll',function(){if(Date.now()<lockT)return;var w=$('tb').clientWidth||1,i=Math.round($('tb').scrollLeft/w);if(i!==curI){tabTouched=true;setTab(i,true)}});
 window.addEventListener('resize',function(){$('tb').scrollLeft=curI*$('tb').clientWidth});
 
 /* navigasi */
@@ -539,7 +549,7 @@ function setHabis(a){var t=key();S.data[t]=S.data[t]||{};S.data[t]._habis=a;auto
 function minOf(it){var m=parseFloat(it.min);if(!isNaN(m))return m;var u=unitKind(it.sat);return u==='g'?200:u==='kg'?0.2:null}
 function autoHabis(){var d=S.data[key()]||{},x=Array.isArray(d._habisX)?d._habisX:[],out=[];
  S.items.forEach(function(it){var r=d[it.id],m=minOf(it);
-  if(m==null||!r||!(filled(r,'a')||filled(r,'m'))||x.indexOf(it.id)>=0)return;
+  if(m==null||!r||!filled(r,'k')||x.indexOf(it.id)>=0)return;
   var v=akhir(r);if(v<m)out.push({id:it.id,nama:it.nama,sisa:v,sat:it.sat})});
  return out}
 function allHabis(){var man=getHabis().map(function(n,i){return{nama:n,i:i}}),low={};
@@ -1190,11 +1200,11 @@ function sync(){
  if(!ps.length)return Promise.resolve();
  $('st').textContent='Menyimpan…';
  return Promise.all(ps).then(function(){if(!pend)$('st').textContent='✓ Tersimpan di cloud'}).catch(function(e){$('st').textContent='⚠ Gagal menyimpan ('+((e&&e.code)||'error')+')'})}
-function updateInputs(){var d=S.data[key()]||{};Array.prototype.forEach.call($('tb').querySelectorAll('.it[data-id]'),function(tr){var id=tr.getAttribute('data-id'),i=tr.querySelector('input');if(i&&i!==document.activeElement){var f=i.getAttribute('data-f'),v=(d[id]&&d[id][f])||'';if(i.value!==v)i.value=v;tr.classList.toggle('fl',v!=='')}});stats()}
+function updateInputs(){var d=S.data[key()]||{};Array.prototype.forEach.call($('tb').querySelectorAll('.it[data-id]'),function(tr){var id=tr.getAttribute('data-id'),i=tr.querySelector('input');if(i&&i!==document.activeElement){var f=i.getAttribute('data-f'),v=(d[id]&&d[id][f])||'',it1=S.items.filter(function(x){return x.id===id})[0];if(it1&&kgIn(it1,f)&&v!=='')v=toKgStr(v);if(i.value!==v)i.value=v;tr.classList.toggle('fl',v!=='')}});stats()}
 function subStok(){
  if(stokU){stokU();stokU=null}if(!db)return;var d=key();
  stokU=db.doc('stok/'+uid()+'_'+d).onSnapshot(function(s){if(pend||s.metadata.hasPendingWrites)return;
-  if(s.exists){S.data[d]=s.data();L.stok[d]=JSON.stringify(S.data[d]);if(carryOver())auto();updateInputs();renderHabis()}else if(!s.metadata.fromCache)L.stok[d]=''},function(){});
+  if(s.exists){S.data[d]=s.data();L.stok[d]=JSON.stringify(S.data[d]);if(carryOver())auto();updateInputs();renderHabis();pickPane()}else if(!s.metadata.fromCache)L.stok[d]=''},function(){});
  prefetchPrev()}
 function startSync(){
  stopSync();L={items:'',locs:'',stok:{},proj:{}};firstProj=true;
@@ -1231,7 +1241,7 @@ function fbInit(){
    entered=true;hideBoot();
    $('lgB').disabled=false;$('lgEr').textContent='';
    BR={id:u.uid,nama:c.nama||''};S.cabName=BR.nama;S.pin=null;S.pd=null;$('cab').value=BR.nama;
-   $('lg').className='ov';$('app').style.display='';
+   $('lg').className='ov';$('app').style.display='';pickPane();
    $('usr').textContent=BR.nama||u.email||'';$('av').textContent=(BR.nama||u.email||'?').charAt(0).toUpperCase();
    startSync();if(off)toast('Mode offline: memakai data cabang tersimpan')}
   var cc=cachedBR(u.uid);if(cc)enter(cc,false);
@@ -1274,7 +1284,7 @@ $('lkImpor').onclick=function(){
 function showDate(){var n=new Date();$('tglx').textContent=tglID(today());
  $('sD').textContent=n.toLocaleDateString('id-ID',{day:'numeric',month:'short'});
  $('sW').textContent=n.toLocaleDateString('id-ID',{weekday:'long',year:'numeric'})}
-var cd=today();document.addEventListener('visibilitychange',function(){if(!document.hidden&&today()!==cd){cd=today();showDate();if(carryOver())save();render();renderHabis();subStok()}});
+var cd=today();document.addEventListener('visibilitychange',function(){if(!document.hidden&&today()!==cd){cd=today();showDate();paneDay='';tabTouched=false;if(carryOver())save();render();renderHabis();pickPane();subStok()}});
 function needGate(cb){if(!S.cabName){cb(true);return}
  if(navigator.permissions&&navigator.permissions.query){navigator.permissions.query({name:'geolocation'}).then(function(r){cb(r.state!=='granted')},function(){cb(false)})}else cb(false)}
 load();var coN=carryOver();$('cab').value=S.cabName;showDate();render();renderMins();renderHabis();renderHist();renderLocs();showLocInfo();if(coN){save();toast('Stok Awal diisi dari Stok Keluar hari sebelumnya ✓')}
