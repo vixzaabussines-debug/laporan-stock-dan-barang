@@ -390,6 +390,28 @@ function rec(id){var d=S.data[key()];return(d&&d[id])||{}}
 function num(v){var n=parseFloat(v);return isNaN(n)?0:n}
 function akhir(r){return Math.round((num(r.a)+num(r.m)-num(r.k))*1000)/1000}
 function fmt(n){return n.toLocaleString('id-ID',{maximumFractionDigits:3})}
+/* Aturan otomatis: Stok Keluar hari sebelumnya -> Stok Awal hari ini (hanya bila Stok Awal hari ini belum pernah diisi/diubah) */
+function carryOver(){
+ var t=key(),re=/^\d{4}-\d{2}-\d{2}$/,has=Object.prototype.hasOwnProperty,n=0,
+ ds=Object.keys(S.data).filter(function(k){return re.test(k)&&k<t}).sort().reverse();
+ if(!ds.length)return 0;
+ S.items.forEach(function(it){
+  var r=(S.data[t]||{})[it.id];if(r&&has.call(r,'a'))return;
+  for(var i=0;i<ds.length;i++){var p=(S.data[ds[i]]||{})[it.id];
+   if(p&&p.k!=null&&String(p.k).trim()!==''){S.data[t]=S.data[t]||{};S.data[t][it.id]=r||{};S.data[t][it.id].a=String(p.k);n++;break}}});
+ return n}
+function pad2(x){return String(x).padStart(2,'0')}
+/* ambil data 7 hari terakhir dari cloud (bila belum ada di perangkat ini), lalu terapkan aturan */
+function prefetchPrev(){
+ if(!db||!auth||!auth.currentUser)return;
+ var t=key(),n=new Date(),ps=[],i;
+ for(i=1;i<=7;i++){(function(d0){var ds=d0.getFullYear()+'-'+pad2(d0.getMonth()+1)+'-'+pad2(d0.getDate());
+  if(S.data[ds])return;
+  ps.push(db.doc('stok/'+uid()+'_'+ds).get().then(function(sn){return sn.exists?{d:ds,v:sn.data()}:null},function(){return null}))})(new Date(n.getFullYear(),n.getMonth(),n.getDate()-i))}
+ if(!ps.length)return;
+ Promise.all(ps).then(function(a){if(key()!==t)return;
+  a.forEach(function(x){if(x&&!S.data[x.d]){S.data[x.d]=x.v;L.stok[x.d]=JSON.stringify(x.v)}});
+  var c=carryOver();if(c){auto();render();toast('Stok Awal diisi dari Stok Keluar hari sebelumnya ✓')}})}
 function tglID(s){var p=s.split('-');if(p.length<3)return s;var d=new Date(+p[0],+p[1]-1,+p[2]);return d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
 
 var flt='all',curI=0,lockT=0,F=['a','m','k'],FL=['Stok Awal','Stok Masuk','Stok Keluar'];
@@ -1041,7 +1063,8 @@ function updateInputs(){var d=S.data[key()]||{};Array.prototype.forEach.call($('
 function subStok(){
  if(stokU){stokU();stokU=null}if(!db)return;var d=key();
  stokU=db.doc('stok/'+uid()+'_'+d).onSnapshot(function(s){if(pend||s.metadata.hasPendingWrites)return;
-  if(s.exists){S.data[d]=s.data();L.stok[d]=JSON.stringify(S.data[d]);updateInputs()}else if(!s.metadata.fromCache)L.stok[d]=''},function(){})}
+  if(s.exists){S.data[d]=s.data();L.stok[d]=JSON.stringify(S.data[d]);if(carryOver())auto();updateInputs()}else if(!s.metadata.fromCache)L.stok[d]=''},function(){});
+ prefetchPrev()}
 function startSync(){
  stopSync();L={items:'',locs:'',stok:{},proj:{}};firstProj=true;
  unsubs.push(db.doc('app/items').onSnapshot(function(s){if(pend||s.metadata.hasPendingWrites)return;
@@ -1120,10 +1143,10 @@ $('lkImpor').onclick=function(){
 function showDate(){var n=new Date();$('tglx').textContent=tglID(today());
  $('sD').textContent=n.toLocaleDateString('id-ID',{day:'numeric',month:'short'});
  $('sW').textContent=n.toLocaleDateString('id-ID',{weekday:'long',year:'numeric'})}
-var cd=today();document.addEventListener('visibilitychange',function(){if(!document.hidden&&today()!==cd){cd=today();showDate();render();subStok()}});
+var cd=today();document.addEventListener('visibilitychange',function(){if(!document.hidden&&today()!==cd){cd=today();showDate();if(carryOver())save();render();subStok()}});
 function needGate(cb){if(!S.cabName){cb(true);return}
  if(navigator.permissions&&navigator.permissions.query){navigator.permissions.query({name:'geolocation'}).then(function(r){cb(r.state!=='granted')},function(){cb(false)})}else cb(false)}
-load();$('cab').value=S.cabName;showDate();render();renderHist();renderLocs();showLocInfo();
+load();var coN=carryOver();$('cab').value=S.cabName;showDate();render();renderHist();renderLocs();showLocInfo();if(coN){save();toast('Stok Awal diisi dari Stok Keluar hari sebelumnya ✓')}
 fbInit();
 })();
 </script>
